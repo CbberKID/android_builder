@@ -33,12 +33,15 @@ jobs:
       - name: Build the app
         working-directory: ./project
         run: |
-          touch gradlew && chmod +x gradlew  # [1](@ref)
+          touch gradlew && chmod +x gradlew
           ./gradlew wrapper --gradle-version 8.2 --distribution-type bin
-          sed -i "s/com\.android\.tools\.build:gradle:.*/com.android.tools.build:gradle:8.2.0\"/g" build.gradle  # [2](@ref)
-          chmod +x gradlew
-          ls -l gradlew && grep 'gradle' build.gradle
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          sed -i "s/com\.android\.tools\.build:gradle:[^']*/com.android.tools.build:gradle:8.2.0\"/g" build.gradle
+          echo "=== 检查 AGP 版本 ==="
+          grep 'com.android.tools.build:gradle' build.gradle
+          echo "=== 检查 gradlew 权限 ==="
+          ls -l gradlew
+          echo "org.gradle.jvmargs=-Xmx2048m" >> gradle.properties
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
