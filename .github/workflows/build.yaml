@@ -1,76 +1,52 @@
-name: android_build
+name: Android Build
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - id: get-project
-        name: Get project name
-        run: echo "PROJECT=$(cat project-to-build)" >> $GITHUB_OUTPUT
-
-      - name: Clone project
-        run: git clone --depth=1 ${{ steps.get-project.outputs.PROJECT }} project
-
       - name: Fix Gradle Permissions
-        working-directory: ./project
-        run: |
-          # 1. 修复 gradlew 权限（必须优先执行）
-          chmod +x gradlew
-          ls -l gradlew  # 验证权限输出 "-rwxr-xr-x"
+        run: chmod +x ./gradlew  # 强制修复 gradlew 权限[2](@ref)
 
       - name: Upgrade Gradle to 8.2
-        working-directory: ./project
         run: |
-          # 2. 升级 Gradle 版本
           sed -i "s|distributionUrl=.*|distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-all.zip|g" gradle/wrapper/gradle-wrapper.properties
-          echo "=== Gradle Version ==="
-          grep distributionUrl gradle/wrapper/gradle-wrapper.properties
 
       - name: Update AGP to 8.2.0
-        working-directory: ./project
         run: |
-          # 3. 替换 AGP 版本（兼容单/双引号）
-          sed -i -E "s/(com\.android\.tools\.build:gradle:)[^'\"]+/\18.2.0/g" build.gradle
-          echo "=== AGP Version Check ==="
-          grep 'com.android.tools.build:gradle' build.gradle
+          # 替换所有模块的 AGP 版本（兼容单双引号）
+          find . -name 'build.gradle' -exec sed -i -E "s/(com\.android\.tools\.build:gradle:)[^'\"]+/\18.2.0/g" {} +
 
-      - name: Add Namespace Declaration
-        working-directory: ./project
+      - name: Add Namespaces for All Modules
         run: |
-          # 4. 动态添加命名空间（示例为 app 模块）
-          if ! grep -q "namespace" app/build.gradle; then
-            sed -i "/android {/a \    namespace 'com.example.yourapp'" app/build.gradle
-          fi
-          echo "=== Namespace Check ==="
-          grep 'namespace' app/build.gradle
+          # 自动为所有模块添加命名空间（示例包名，需替换为你的包名）
+          find . -name 'build.gradle' -exec sed -i "/android {/a \    namespace 'com.example.yourapp'" {} +
 
-      - name: Force AGP Resolution
-        working-directory: ./project
+      - name: Force Dependency Resolution
         run: |
-          # 5. 强制统一 AGP 版本
-          echo -e "\nallprojects {\n  configurations.all {\n    resolutionStrategy.force 'com.android.tools.build:gradle:8.2.0'\n  }\n}" >> build.gradle
+          # 强制统一 AGP 和 Kotlin 插件版本
+          echo -e "\nallprojects {\n  configurations.all {\n    resolutionStrategy.force 'com.android.tools.build:gradle:8.2.0'\n    resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20'\n  }\n}" >> build.gradle
 
-      - name: Clean and Build
-        working-directory: ./project
+      - name: Build Debug APK
         run: |
-          # 6. 清理缓存并构建
           ./gradlew clean
           ./gradlew assembleDebug --stacktrace --refresh-dependencies
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-build-apk
-          path: ./project/app/build/outputs/apk/**/*.apk
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
