@@ -8,27 +8,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v4  # 更新到最新版本
-      - name: Set up JDK
-        uses: actions/setup-java@v4  # 使用 v4 并动态选择 Java 版本
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17  # 强制使用 Java 17 以兼容 AGP 8.x
+        uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'  # 兼容性更好的 Zulu JDK
-          java-version: '11'    # 根据项目需求调整版本
+          distribution: 'zulu'
+          java-version: '17'
 
       - id: get-project
         name: Get project name
-        run: echo "PROJECT=$(cat project-to-build)" >> $GITHUB_OUTPUT  # 修正输出语法
+        run: echo "PROJECT=$(cat project-to-build)" >> $GITHUB_OUTPUT
 
       - name: Clone project
         run: git clone --depth=1 ${{ steps.get-project.outputs.PROJECT }} project
+
+      - name: Install Android SDK 34  # 安装 compileSdk=34 所需 SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+          ndk: false
+
       - name: Build the app
         working-directory: ./project
         run: |
-          if [ ! -f "gradlew" ]; then gradle wrapper; fi
+          # 强制升级 Gradle 到 8.2 + 指定 AGP 8.2.0
+          ./gradlew wrapper --gradle-version 8.2 --distribution-type bin
+          sed -i "s/com.android.tools.build:gradle:.*/com.android.tools.build:gradle:8.2.0'/g" build.gradle  # 动态替换 AGP 版本
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace --no-daemon -Pandroid.plugin.version=8.2.0
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: my-build-apk
-          path: ./**/*.apk
+          path: ./project/app/build/outputs/apk/**/*.apk
