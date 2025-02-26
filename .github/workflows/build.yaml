@@ -33,35 +33,35 @@ jobs:
       - name: Build the app
         working-directory: ./project
         run: |
-          # 修复 1：预生成 gradlew 并赋予权限
+          # 1. 确保 gradlew 有执行权限
           touch gradlew && chmod +x gradlew
 
-          # 修复 2：升级 Gradle 到 8.2
+          # 2. 强制升级 Gradle 到 8.2
           ./gradlew wrapper --gradle-version 8.2 --distribution-type bin
 
-          # 修复 3：精确替换 AGP 版本（兼容单/双引号）
-          sed -i "s/com\.android\.tools\.build:gradle:[^'\"']*/com.android.tools.build:gradle:8.2.0\"/g" build.gradle
+          # 3. 动态修复 AGP 版本（兼容单/双引号）
+          sed -i "s/com\.android\.tools\.build:gradle:[^'\"']*/com.android.tools.build:gradle:8.2.0'/g" build.gradle
 
-          # 修复 4：强制添加 Google 仓库配置
+          # 4. 动态添加 Google 和 Maven 仓库
           sed -i "/repositories {/a \        google()" build.gradle
           sed -i "/repositories {/a \        mavenCentral()" build.gradle
 
-          # 修复 5：注入依赖统一策略（处理第三方插件冲突）
+          # 5. 强制统一所有依赖的 AGP 版本
           echo -e "\nallprojects {\n  configurations.all {\n    resolutionStrategy.force 'com.android.tools.build:gradle:8.2.0'\n  }\n}" >> build.gradle
 
-          # 调试：验证关键配置
-          echo "=== AGP 版本 ==="
-          grep 'com.android.tools.build:gradle' build.gradle
-          echo "=== 仓库配置 ==="
-          grep 'repositories' build.gradle
-          echo "=== 依赖强制策略 ==="
-          tail -n 5 build.gradle
-
-          # 修复 6：优化内存配置
+          # 6. 优化内存配置
           echo "org.gradle.jvmargs=-Xmx2048m" >> gradle.properties
 
-          # 执行构建
-          ./gradlew assembleDebug --stacktrace --scan
+          # 7. 调试：验证关键配置
+          echo "=== 检查 AGP 版本 ==="
+          grep 'com.android.tools.build:gradle' build.gradle
+          echo "=== 检查仓库配置 ==="
+          grep 'repositories' build.gradle
+          echo "=== 检查依赖强制策略 ==="
+          tail -n 6 build.gradle
+
+          # 8. 执行构建
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
