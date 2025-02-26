@@ -23,14 +23,14 @@ jobs:
       - name: Clone project
         run: git clone --depth=1 ${{ steps.get-project.outputs.PROJECT }} project
 
-      - name: Fix Gradle Wrapper Permissions
+      - name: Fix Gradle Permissions
         working-directory: ./project
         run: |
-          # 1. 强制修复 gradlew 权限（优先执行）
+          # 1. 修复 gradlew 权限（必须优先执行）
           chmod +x gradlew
           ls -l gradlew  # 验证权限输出 "-rwxr-xr-x"
 
-      - name: Update Gradle Wrapper to 8.2
+      - name: Upgrade Gradle to 8.2
         working-directory: ./project
         run: |
           # 2. 升级 Gradle 版本
@@ -38,29 +38,28 @@ jobs:
           echo "=== Gradle Version ==="
           grep distributionUrl gradle/wrapper/gradle-wrapper.properties
 
-      - name: Fix AGP Version
+      - name: Update AGP to 8.2.0
         working-directory: ./project
         run: |
-          # 3. 替换 AGP 版本为 8.2.0（兼容单/双引号）
+          # 3. 替换 AGP 版本（兼容单/双引号）
           sed -i -E "s/(com\.android\.tools\.build:gradle:)[^'\"]+/\18.2.0/g" build.gradle
           echo "=== AGP Version Check ==="
           grep 'com.android.tools.build:gradle' build.gradle
 
-      - name: Add Repositories
+      - name: Add Namespace Declaration
         working-directory: ./project
         run: |
-          # 4. 动态添加仓库（避免重复）
-          if ! grep -q "google()" build.gradle; then
-            sed -i "/repositories {/a \        google()" build.gradle
-            sed -i "/repositories {/a \        mavenCentral()" build.gradle
+          # 4. 动态添加命名空间（示例为 app 模块）
+          if ! grep -q "namespace" app/build.gradle; then
+            sed -i "/android {/a \    namespace 'com.example.yourapp'" app/build.gradle
           fi
-          echo "=== Repositories Check ==="
-          grep 'repositories' build.gradle
+          echo "=== Namespace Check ==="
+          grep 'namespace' app/build.gradle
 
       - name: Force AGP Resolution
         working-directory: ./project
         run: |
-          # 5. 强制统一所有模块的 AGP 版本
+          # 5. 强制统一 AGP 版本
           echo -e "\nallprojects {\n  configurations.all {\n    resolutionStrategy.force 'com.android.tools.build:gradle:8.2.0'\n  }\n}" >> build.gradle
 
       - name: Clean and Build
