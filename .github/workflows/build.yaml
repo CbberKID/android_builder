@@ -30,32 +30,25 @@ jobs:
           build-tools: 34.0.0
           ndk: false
 
-      - name: Build the app
+      - name: Update Gradle Wrapper
         working-directory: ./project
         run: |
-          # 1. 强制修复 gradlew 权限
-          chmod +x gradlew
+          sed -i "s/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.2-all.zip/g" gradle/wrapper/gradle-wrapper.properties
+          cat gradle/wrapper/gradle-wrapper.properties | grep distributionUrl
 
-          # 2. 修复 AGP 版本替换
+      - name: Update AGP Version
+        working-directory: ./project
+        run: |
           sed -i -E "s/(com\.android\.tools\.build:gradle:)[^'\"]+/\18.2.0/g" build.gradle
-
-          # 3. 动态添加仓库（避免重复）
-          if ! grep -q "google()" build.gradle; then
-            sed -i "/repositories {/a \        google()" build.gradle
-            sed -i "/repositories {/a \        mavenCentral()" build.gradle
-          fi
-
-          # 4. 强制统一 AGP 版本
-          echo -e "\nallprojects {\n  configurations.all {\n    resolutionStrategy.force 'com.android.tools.build:gradle:8.2.0'\n  }\n}" >> build.gradle
-
-          # 5. 验证配置
-          echo "=== AGP 版本检查 ==="
           grep 'com.android.tools.build:gradle' build.gradle
-          echo "=== 仓库配置检查 ==="
-          grep 'repositories' build.gradle
 
-          # 6. 执行构建
-          ./gradlew assembleDebug --stacktrace
+      - name: Clean Project
+        working-directory: ./project
+        run: ./gradlew clean
+
+      - name: Build the App
+        working-directory: ./project
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
