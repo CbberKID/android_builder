@@ -1,52 +1,31 @@
-name: Android Build
+name: android_build
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
+      - name: Checkout the code
+        uses: actions/checkout@v2
+      - name: Set up JDK
+        uses: actions/setup-java@v1
         with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Fix Gradle Permissions
-        run: chmod +x ./gradlew  # 强制修复 gradlew 权限[2](@ref)
-
-      - name: Upgrade Gradle to 8.2
+          java-version: 1.8
+      - id: get-project
+        name: Get project name
+        run: echo "::set-output name=PROJECT::$(cat project-to-build)"
+      - name: Clone project
+        run: git clone --depth=1 ${{ steps.get-project.outputs.PROJECT }} project
+      - name: Build the app
+        working-directory: ./project
         run: |
-          sed -i "s|distributionUrl=.*|distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-all.zip|g" gradle/wrapper/gradle-wrapper.properties
-
-      - name: Update AGP to 8.2.0
-        run: |
-          # 替换所有模块的 AGP 版本（兼容单双引号）
-          find . -name 'build.gradle' -exec sed -i -E "s/(com\.android\.tools\.build:gradle:)[^'\"]+/\18.2.0/g" {} +
-
-      - name: Add Namespaces for All Modules
-        run: |
-          # 自动为所有模块添加命名空间（示例包名，需替换为你的包名）
-          find . -name 'build.gradle' -exec sed -i "/android {/a \    namespace 'com.example.yourapp'" {} +
-
-      - name: Force Dependency Resolution
-        run: |
-          # 强制统一 AGP 和 Kotlin 插件版本
-          echo -e "\nallprojects {\n  configurations.all {\n    resolutionStrategy.force 'com.android.tools.build:gradle:8.2.0'\n    resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20'\n  }\n}" >> build.gradle
-
-      - name: Build Debug APK
-        run: |
-          ./gradlew clean
-          ./gradlew assembleDebug --stacktrace --refresh-dependencies
-
-      - name: Upload APK Artifact
+          if [ ! -f "gradlew" ]; then gradle wrapper; fi
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: my-build-apk
+          path: ./**/*.apk
